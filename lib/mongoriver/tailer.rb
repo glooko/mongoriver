@@ -5,7 +5,6 @@ module Mongoriver
 
     attr_reader :upstream_conn
     attr_reader :oplog
-    attr_reader :database_type
 
     def initialize(upstreams, type, oplog = "oplog.rs")
       @upstreams = upstreams
@@ -19,7 +18,6 @@ module Mongoriver
       @streaming = false
 
       connect_upstream
-      @database_type = Mongoriver::Toku.conversion_needed?(@upstream_conn) ? :toku : :mongo
     end
 
     # Return a position for a record object
@@ -28,24 +26,14 @@ module Mongoriver
     # @return [BSON::Binary] if tokumx
     def position(record)
       return nil unless record
-      case database_type
-      when :mongo
-        return record['ts']
-      when :toku
-        return record['_id']
-      end
+      record['ts']
     end
 
     # Return a time for a record object
     # @return Time
     def time_for(record)
       return nil unless record
-      case database_type
-      when :mongo
-        return Time.at(record['ts'].seconds)
-      when :toku
-        return record['ts']
-      end
+      Time.at(record['ts'].seconds)
     end
 
     # Find the most recent entry in oplog and return a position for that
@@ -59,21 +47,11 @@ module Mongoriver
     def latest_oplog_entry(before_time=nil)
       query = {}
       if before_time
-        case database_type
-        when :mongo
-          ts = BSON::Timestamp.new(before_time.to_i + 1, 0)
-        when :toku
-          ts = before_time + 1
-        end
+        ts = BSON::Timestamp.new(before_time.to_i + 1, 0)
         query = { 'ts' => { '$lt' => ts } }
       end
 
-      case database_type
-      when :mongo
-        record = oplog_collection.find_one(query, :sort => [['$natural', -1]])
-      when :toku
-        record = oplog_collection.find_one(query, :sort => [['_id', -1]])
-      end
+      record = oplog_collection.find_one(query, :sort => [['$natural', -1]])
       record
     end
 
@@ -168,18 +146,11 @@ module Mongoriver
         break if limit && count >= limit
 
         record = @cursor.next
-
-        case database_type
-        when :mongo
-          blk.call(record)
-        when :toku
-          converted = Toku.convert(record, @upstream_conn)
-          converted.each(&blk)
-        end
+        blk.call(record)
       end
       @streaming = false
 
-      return @cursor.has_next?
+      @cursor.has_next?
     end
 
     def stop
@@ -196,17 +167,10 @@ module Mongoriver
     def build_tail_query(opts = {})
       query = opts[:filter] || {}
       return query unless opts[:from]
-
-      case database_type
-      when :mongo
-        assert(opts[:from].is_a?(BSON::Timestamp),
-          "For mongo databases, tail :from must be a BSON::Timestamp")
-        query['ts'] = { '$gt' => opts[:from] }
-      when :toku
-        assert(opts[:from].is_a?(BSON::Binary),
-          "For tokumx databases, tail :from must be a BSON::Binary")
-        query['_id'] = { '$gt' => opts[:from] }
-      end
+      assert(opts[:from].is_a?(BSON::Timestamp),
+        "For mongo databases, tail :from must be a BSON::Timestamp")
+      query['ts'] = { '$gt' => opts[:from] }
+      query['ns'] = "#{opts[:db]}.#{opts[:collection]}" if opts[:collection]
 
       query
     end
