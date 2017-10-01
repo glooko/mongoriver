@@ -132,7 +132,7 @@ module Mongoriver
     end
 
     def handle_cmd(db_name, collection_name, data)
-      if deleted_from_collection = data['deleteIndexes']
+      if deleted_from_collection = data['deleteIndexes'] || data['dropIndexes']
         index_name = data['index']
         trigger(:drop_index, db_name, deleted_from_collection, index_name)
       elsif created_collection = data['create']
