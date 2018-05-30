@@ -4,9 +4,9 @@ module Mongoriver
     # implement these methods in your subclass
     def update_optime(timestamp); end
 
-    def insert(db_name, collection_name, document); end
-    def remove(db_name, collection_name, document); end
-    def update(db_name, collection_name, selector, update); end
+    def insert(db_name, collection_name, document, time); end
+    def remove(db_name, collection_name, document, time); end
+    def update(db_name, collection_name, selector, update, time); end
 
     def create_index(db_name, collection_name, index_key, options); end
     def drop_index(db_name, collection_name, index_name); end

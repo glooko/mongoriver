@@ -61,6 +61,7 @@ module Mongoriver
       op = entry['op']
       data = entry['o']
       ns = entry['ns']
+      optime = entry['ts']
 
       if op == 'n'
         # This happens for initial rs.initiate() op, maybe others.
@@ -73,12 +74,12 @@ module Mongoriver
 
       case op
       when 'i'
-        handle_insert(db_name, collection_name, data)
+        handle_insert(db_name, collection_name, data, optime)
       when 'u'
         selector = entry['o2']
-        trigger(:update, db_name, collection_name, selector, data)
+        trigger(:update, db_name, collection_name, selector, data, optime)
       when 'd'
-        trigger(:remove, db_name, collection_name, data)
+        trigger(:remove, db_name, collection_name, data, optime)
       when 'c'
         assert(collection_name == '$cmd',
                "Command collection name is #{collection_name.inspect} for " \
@@ -93,11 +94,11 @@ module Mongoriver
       trigger(:update_optime, optime.seconds)
     end
 
-    def handle_insert(db_name, collection_name, data)
+    def handle_insert(db_name, collection_name, data, optime)
       if collection_name == 'system.indexes'
         handle_create_index(data)
       else
-        trigger(:insert, db_name, collection_name, data)
+        trigger(:insert, db_name, collection_name, data, optime)
       end
     end
 
